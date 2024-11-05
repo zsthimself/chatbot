@@ -5,8 +5,9 @@ const API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 export async function POST(request: Request) {
   if (!DEEPSEEK_API_KEY) {
+    console.error('Missing DEEPSEEK_API_KEY environment variable');
     return NextResponse.json(
-      { error: 'API密钥未配置' },
+      { error: '服务器配置错误' },
       { status: 500 }
     );
   }
