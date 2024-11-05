@@ -15,6 +15,7 @@ body {
     rgb(var(--background-start-rgb)),
     rgb(var(--background-end-rgb))
   );
+  min-height: 100vh;
 }
 
 /* 添加平滑滚动效果 */
@@ -22,20 +23,45 @@ html {
   scroll-behavior: smooth;
 }
 
-/* 添加渐变动画效果 */
-@keyframes gradient {
-  0% {
-    background-position: 0% 50%;
+/* Markdown 样式优化 */
+.prose {
+  max-width: none;
+}
+
+.prose pre {
+  background-color: rgb(31, 41, 55);
+  color: rgb(229, 231, 235);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.prose code {
+  color: rgb(31, 41, 55);
+  background-color: rgb(243, 244, 246);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.prose pre code {
+  color: inherit;
+  background-color: transparent;
+  padding: 0;
+}
+
+/* 聊天气泡动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.gradient-animate {
-  background-size: 200% 200%;
-  animation: gradient 15s ease infinite;
+.chat-message {
+  animation: fadeIn 0.3s ease-out forwards;
 }
