@@ -32,6 +32,12 @@ const SYSTEM_PROMPT = `你是一位专门辅导初中生学习编程的AI助教�
 
 请记住：你的目标是培养学生的编程兴趣和自信心，而不是追求技术的深度。`;
 
+interface ApiError {
+  message: string;
+  stack?: string;
+  cause?: unknown;
+}
+
 export async function POST(request: Request) {
   if (!DEEPSEEK_API_KEY) {
     console.error('Missing DEEPSEEK_API_KEY environment variable');
@@ -72,9 +78,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Chat API Error:', error);
+    const apiError = error as ApiError;
+    console.error('Chat API Error:', {
+      message: apiError.message || '未知错误',
+      stack: apiError.stack,
+      cause: apiError.cause
+    });
     return NextResponse.json(
-      { error: '抱歉，我现在有点累了，请稍后再试～' },
+      { error: apiError.message || '服务器错误' },
       { status: 500 }
     );
   }
