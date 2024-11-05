@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requestQueue } from '@/lib/requestQueue';
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const API_URL = 'https://api.deepseek.com/v1/chat/completions';
@@ -30,7 +31,7 @@ const SYSTEM_PROMPT = `你是一位专门辅导初中生学习编程的AI助教�
 - 简单的算法思维训练
 - 基础的网页制作（HTML/CSS）
 
-请记住：你的目标是培养学生的编程兴趣和自信心，而不是追求技术的深度。`;
+请记住：你的目标是培养学生的编程���趣和自信心，而不是追求技术的深度。`;
 
 interface ApiError {
   message: string;
@@ -38,16 +39,19 @@ interface ApiError {
   cause?: unknown;
 }
 
-export async function POST(request: Request) {
-  if (!DEEPSEEK_API_KEY) {
-    console.error('Missing DEEPSEEK_API_KEY environment variable');
-    return NextResponse.json(
-      { error: '服务器配置错误' },
-      { status: 500 }
-    );
-  }
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1秒
 
+async function makeRequest(request: Request, retryCount = 0): Promise<Response> {
   try {
+    if (!DEEPSEEK_API_KEY) {
+      console.error('Missing DEEPSEEK_API_KEY environment variable');
+      return NextResponse.json(
+        { error: '服务器配置错误' },
+        { status: 500 }
+      );
+    }
+
     const { messages } = await request.json();
 
     // 在用户消息前添加系统提示
@@ -61,7 +65,9 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        'retry-after': '2',
       },
+      signal: AbortSignal.timeout(10000),
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: fullMessages,
@@ -69,6 +75,11 @@ export async function POST(request: Request) {
         max_tokens: 2000,
       }),
     });
+
+    if (response.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return makeRequest(request);
+    }
 
     const data = await response.json();
     
@@ -81,12 +92,52 @@ export async function POST(request: Request) {
     const apiError = error as ApiError;
     console.error('Chat API Error:', {
       message: apiError.message || '未知错误',
+      status: apiError.name === 'AbortError' ? '请求超时' : apiError.message,
+      timestamp: new Date().toISOString(),
       stack: apiError.stack,
-      cause: apiError.cause
     });
+    
+    if (retryCount < MAX_RETRIES) {
+      console.log(`重试请求 ${retryCount + 1}/${MAX_RETRIES}`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return makeRequest(request, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const response = await makeRequest(request);
+
+    if (response.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return POST(request);
+    }
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'API调用失败');
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    const apiError = error as ApiError;
+    console.error('Chat API Error:', {
+      message: apiError.message || '未知错误',
+      status: apiError.name === 'AbortError' ? '请求超时' : apiError.message,
+      timestamp: new Date().toISOString(),
+      stack: apiError.stack,
+    });
+    
     return NextResponse.json(
-      { error: apiError.message || '服务器错误' },
-      { status: 500 }
+      { 
+        error: apiError.name === 'AbortError' 
+          ? '请求超时，请稍后重试' 
+          : (apiError.message || '服务器错误')
+      },
+      { status: apiError.name === 'AbortError' ? 408 : 500 }
     );
   }
 } 
