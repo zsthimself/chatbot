@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 
-const DEEPSEEK_API_KEY = 'sk-268b0da7cb8e4c218d8065f901c4b5cb';
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 export async function POST(request: Request) {
+  if (!DEEPSEEK_API_KEY) {
+    return NextResponse.json(
+      { error: 'API密钥未配置' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { messages } = await request.json();
 
